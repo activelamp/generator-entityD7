@@ -1,0 +1,8 @@
+name = Custom Entity
+description = MODULE_DESCRIPTION
+core = 7.x
+
+dependencies[] = entity
+dependencies[] = xautoload
+
+configure = admin/structure/custom_entity/manage

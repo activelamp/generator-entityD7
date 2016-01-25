@@ -1,0 +1,275 @@
+<?php
+
+/**
+ * Implements hook_entity_info().
+ */
+function custom_entity_entity_info() {
+  $return = array(
+    'custom_entity' => array(
+      'label' => t('Custom Entity'),
+      'plural label' => t('Custom Entity'),
+      'description' => t('A Custom Entity entity.'),
+      'entity class' => 'Drupal\custom_entity\Entity\CustomEntity',
+      'controller class' => 'EntityAPIController',
+      'base table' => 'custom_entity',
+      'fieldable' => TRUE,
+      'entity keys' => array(
+        'id' => 'id',
+        'label' => 'label',
+        'bundle' => 'type',
+      ),
+      'uri callback' => 'entity_class_uri',
+      'bundles' => array(),
+      'bundle keys' => array(
+        'bundle' => 'name',
+      ),
+      'module' => 'custom_entity',
+    ),
+    'custom_entity_type' => array(
+      'label' => t('Custom Entity type'),
+      'entity class' => 'Entity',
+      'controller class' => 'EntityAPIControllerExportable',
+      'base table' => 'custom_entity_type',
+      'fieldable' => FALSE,
+      'bundle of' => 'custom_entity',
+      'exportable' => TRUE,
+      'entity keys' => array(
+        'id' => 'id',
+        'label' => 'label',
+        'name' => 'name',
+      ),
+      'module' => 'custom_entity',
+      'access callback' => 'custom_entity_type_access',
+      // Enable the entity API's admin UI.
+      'admin ui' => array(
+        'path' => 'admin/structure/entity/custom_entity',
+        'file' => 'includes/custom_entity.admin.inc',
+        'controller class' => 'Drupal\custom_entity\Entity\Controller\CustomEntityTypeUIController',
+      ),
+    ),
+
+  );
+
+  // Add bundle info but bypass entity_load() as we cannot use it here.
+  $types = db_select('custom_entity_type', 'et')
+    ->fields('et')
+    ->execute()
+    ->fetchAllAssoc('name');
+
+  foreach ($types as $type => $info) {
+    $return['custom_entity']['bundles'][$type] = array(
+      'label' => $info->label,
+      'admin' => array(
+        'path' => 'admin/structure/entity/custom_entity/manage/%custom_entity_type',
+        'real path' => 'admin/structure/entity/custom_entity/manage/' . $type,
+        'bundle argument' => 5,
+        'access arguments' => array('administer custom_entity')
+      )
+    );
+  }
+
+  // Support entity cache module.
+  if (module_exists('entitycache')) {
+    $return['custom_entity']['field cache'] = FALSE;
+    $return['custom_entity']['entity cache'] = TRUE;
+  }
+
+  return $return;
+}
+
+/**
+ * Menu argument loader; Load a profile type by string.
+ *
+ * @param $type
+ *   The machine-readable name of a profile type to load.
+ * @return
+ *   A profile type array or FALSE if $type does not exist.
+ */
+function custom_entity_type_load($type) {
+  return custom_entity_get_types($type);
+}
+
+/**
+ * Gets an array of all test entity types, keyed by the name.
+ *
+ * @param $name
+ *   If set, the type with the given name is returned.
+ */
+function custom_entity_get_types($name = NULL) {
+  $types = entity_load_multiple_by_name('custom_entity_type', isset($name) ? array($name) : FALSE);
+  return isset($name) ? reset($types) : $types;
+}
+
+/**
+ * Load multiple entities based on certain conditions.
+ *
+ * @param $ids
+ *   An array of entity IDs.
+ * @param $conditions
+ *   An array of conditions to match against the {entity} table.
+ * @param $reset
+ *   A boolean indicating that the internal cache should be reset.
+ * @return
+ *   An array of test entity objects, indexed by id.
+ */
+function custom_entity_load_multiple($ids = array(), $conditions = array(), $reset = FALSE) {
+  return entity_load('custom_entity', $ids, $conditions, $reset);
+}
+
+/**
+ * Load a custom_entity entity
+ */
+function custom_entity_load($id = NULL, $reset = FALSE) {
+  $ids = (isset($id) ? array($id) : array());
+  $custom_entity = custom_entity_load_multiple($ids, $reset);
+  return $custom_entity ? reset($custom_entity) : FALSE;
+}
+
+/**
+ * Delete multiple test entities.
+ *
+ * @param $ids
+ *   An array of test entity IDs.
+ */
+function custom_entity_delete_multiple(array $ids) {
+  entity_get_controller('custom_entity')->delete($ids);
+}
+
+/**
+ * Implements hook_permission().
+ */
+function custom_entity_permission() {
+  return array(
+    'administer custom_entity' => array(
+      'title' => t('Administer Custom Entity Entities'),
+      'description' => t('Full administration to IT services.'),
+    ),
+    'delete custom_entity' => array(
+      'title' => t('Delete Custom Entity Entities'),
+      'description' => t('Delete IT services.'),
+    ),
+    'access custom_entity' => array(
+      'title' => t('View Custom Entity Entities'),
+      'description' => t('View IT services.'),
+    ),
+    'edit custom_entity' => array(
+      'title' => t('Edit Custom Entity Entities'),
+      'description' => t('Edit IT services.'),
+    ),
+  );
+}
+
+/**
+ * Access callback for the entity API.
+ */
+function custom_entity_type_access($op, $type = NULL, $account = NULL) {
+  return user_access('administer custom_entity', $account);
+}
+
+/**
+ * Implements hook_menu().
+ */
+function custom_entity_menu() {
+  
+  $items = [
+    'admin/content/custom_entity' => [
+      'title' => 'Custom Entity',
+      'description' => 'Manage services on your site.',
+      'access arguments' => array('administer custom_entity'),
+      'type' => MENU_LOCAL_TASK | MENU_NORMAL_ITEM,
+    ],
+    'custom_entity/add' => [
+      'title' => t('Add a new XPRIZE Competition'),
+      'page callback' => 'entity_ui_get_form',
+      'page arguments' => array('custom_entity', NULL, 'add'),
+      'access arguments' => array('administer custom_entity'),
+      'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+      'file' => 'includes/custom_entity.crud.inc',
+    ],
+    'custom_entity/%custom_entity' => [
+      'title callback' => 'custom_entity_page_title',
+      'title arguments' => array(1),
+      'page callback' => 'custom_entity_page_view',
+      'page arguments' => array(1),
+      'access callback' => 'custom_entity_entity_access',
+      'access arguments' => array('view', 1),
+      'file' => 'includes/custom_entity.crud.inc'
+    ],
+    'custom_entity/%custom_entity/view' => [
+      'title' => t('View'),
+      'type' => MENU_DEFAULT_LOCAL_TASK,
+      'weight' => -10,
+    ],
+    'custom_entity/%custom_entity/edit' => [
+      'title' => t('Edit'),
+      'page callback' => 'custom_entity_edit',
+      'page arguments' => array(1),
+      'access callback' => 'custom_entity_entity_access',
+      'access arguments' => array('edit', 1),
+      'file' => 'includes/custom_entity.crud.inc',
+      'weight' => 0,
+      'type' => MENU_LOCAL_TASK,
+      'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+    ],
+    'custom_entity/%custom_entity/delete' => [
+      'title' => t('Delete'),
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('custom_entity_confirm_delete_page', 1),
+      'access callback' => 'custom_entity_entity_access',
+      'access arguments' => array('delete', 1),
+      'file' => 'includes/custom_entity.crud.inc',
+      'weight' => 10,
+      'type' => MENU_CALLBACK,
+      'context' => MENU_CONTEXT_PAGE | MENU_CONTEXT_INLINE,
+    ]
+  ];
+
+  if (module_exists('devel_generate')) {
+    $items['admin/config/development/generate/custom_entity'] = array(
+      'title' => 'Generate services',
+      'description' => 'Generate a given number of Custom Entitys. Optionally delete existing Services.',
+      'page callback' => 'drupal_get_form',
+      'page arguments' => array('custom_entity_generate_form', 'custom_entity'),
+      'access arguments' => array('administer custom_entity'),
+      'file' => 'includes/custom_entity.generate.inc',
+    );
+  }
+
+  return $items;
+}
+
+/**
+ * Implements hook_views_api().
+ */
+function custom_entity_views_api($module, $api) {
+  if ($module == 'views' && $api == 'views_default') {
+    return array('version' => 2);
+  }
+}
+
+/**
+ * Access control callback for services.
+ */
+function custom_entity_entity_access($op, $entity) {
+  if (user_access('administer custom_entity')) {
+    return TRUE;
+  }
+
+  switch ($op) {
+    case 'view':
+      if (property_exists($entity, 'status') && $entity->status == 0) {
+        return user_access('view unpublished services');
+      }
+      else {
+        return user_access('access custom_entity');
+      }
+
+    case 'edit':
+      return user_access('edit custom_entity');
+
+    case 'delete':
+      return user_access('delete custom_entity');
+  }
+
+  return FALSE;
+}

@@ -1,0 +1,173 @@
+<?php
+/**
+ * @file
+ * Install for a custom_entity entity - need to create the base table for our entity.
+ */
+
+/**
+ * Implements hook_uninstall().
+ * 
+ * @ingroup custom_entity
+ */
+function custom_entity_uninstall() {
+  // Bypass entity_load() as we cannot use it here.
+  $types = db_select('custom_entity_type', 'et')
+    ->fields('et')
+    ->execute()
+    ->fetchAllAssoc('name');
+
+  foreach ($types as $name => $type) {
+    field_attach_delete_bundle('custom_entity', $name);
+  }
+}
+
+/**
+ * Implements hook_schema().
+ *
+ * @ingroup custom_entity
+ */
+function custom_entity_schema() {
+  $schema = array();
+
+  $schema['custom_entity'] = array(
+    'description' => 'Stores custom_entity items.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'Primary Key: Unique custom_entity item ID.',
+      ),
+      'name' => array(
+        'description' => 'The name of the custom_entity.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'uid' => array(
+        'type' => 'int',
+        'unsigned' => TRUE,
+        'not null' => FALSE,
+        'default' => NULL,
+        'description' => "The {users}.uid of the associated user.",
+      ),
+      'label' => array(
+        'description' => 'A human-readable label for this profile.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'created' => array(
+        'description' => 'The Unix timestamp when the profile was created.',
+        'type' => 'int',
+        'not null' => FALSE,
+      ),
+      'changed' => array(
+        'description' => 'The Unix timestamp when the profile was most recently saved.',
+        'type' => 'int',
+        'not null' => FALSE,
+      ),
+      'status' => array(
+        'description' => 'Boolean indicating whether the entity is published (visible to non-administrators).',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 1
+      ),
+    ),
+    'indexes' => array(
+      'uid' => array('uid'),
+    ),
+    'foreign keys' => array(
+      'uid' => array(
+        'table' => 'users',
+        'columns' => array('uid' => 'uid')
+      ),
+      'name' => array(
+        'table' => 'custom_entity_types',
+        'columns' => array('name' => 'name')
+      ),
+    ),
+    'primary key' => array('id'),
+  );
+
+  $schema['custom_entity_type'] = array(
+    'description' => 'Stores information about all defined custom_entity types.',
+    'fields' => array(
+      'id' => array(
+        'type' => 'serial',
+        'not null' => TRUE,
+        'description' => 'Primary Key: Unique custom_entity type ID.',
+      ),
+      'name' => array(
+        'description' => 'The machine-readable name of this custom_entity type.',
+        'type' => 'varchar',
+        'length' => 32,
+        'not null' => TRUE,
+      ),
+      'label' => array(
+        'description' => 'The human-readable name of this custom_entity type.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => TRUE,
+        'default' => '',
+      ),
+      'weight' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+        'description' => 'The weight of this custom_entity type in relation to others.',
+      ),
+      'locked' => array(
+        'description' => 'A boolean indicating whether the administrator may delete this type.',
+        'type' => 'int',
+        'not null' => TRUE,
+        'default' => 0,
+        'size' => 'tiny',
+      ),
+      'data' => array(
+        'type' => 'text',
+        'not null' => FALSE,
+        'size' => 'big',
+        'serialize' => TRUE,
+        'description' => 'A serialized array of additional data related to this custom_entity type.',
+        'merge' => TRUE,
+      ),
+      'status' => array(
+        'type' => 'int',
+        'not null' => TRUE,
+        // Set the default to ENTITY_CUSTOM without using the constant as it is
+        // not safe to use it at this point.
+        'default' => 0x01,
+        'size' => 'tiny',
+        'description' => 'The exportable status of the entity.',
+      ),
+      'module' => array(
+        'description' => 'The name of the providing module if the entity has been defined in code.',
+        'type' => 'varchar',
+        'length' => 255,
+        'not null' => FALSE,
+      ),
+    ),
+    'primary key' => array('id'),
+    'unique keys' => array(
+      'name' => array('name'),
+    ),
+  );
+
+  return $schema;
+}
+
+/*
+ * Implements hook_install().
+ */
+function custom_entity_install() {
+  // Create the default bundles for the XPRIZE competition
+  $type = entity_create('custom_entity_type', array(
+    'name' => 'custom_entity',
+    'label' => st('Custom Entity'),
+    'weight' => 0,
+  ));
+  $type->save();
+}
