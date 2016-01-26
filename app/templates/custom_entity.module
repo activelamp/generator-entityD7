@@ -226,7 +226,7 @@ function custom_entity_menu() {
 
   if (module_exists('devel_generate')) {
     $items['admin/config/development/generate/custom_entity'] = array(
-      'title' => 'Generate services',
+      'title' => 'Generate Custom Entity',
       'description' => 'Generate a given number of Custom Entitys. Optionally delete existing Services.',
       'page callback' => 'drupal_get_form',
       'page arguments' => array('custom_entity_generate_form', 'custom_entity'),
@@ -272,4 +272,20 @@ function custom_entity_entity_access($op, $entity) {
   }
 
   return FALSE;
+}
+
+/**
+ * Implements hook_admin_paths().
+ */
+function custom_entity_admin_paths() {
+  $paths = array(
+    'custom_entity/*/edit' => TRUE,
+    'custom_entity/*/delete' => TRUE,
+    'custom_entity/*/revisions' => TRUE,
+    'custom_entity/*/revisions/*/revert' => TRUE,
+    'custom_entity/*/revisions/*/delete' => TRUE,
+    'custom_entity/add' => TRUE,
+    'custom_entity/add/*' => TRUE,
+  );
+  return $paths;
 }
